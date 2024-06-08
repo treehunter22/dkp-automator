@@ -15,7 +15,7 @@ fn pre_process_lines(timers: BufReader<File>) -> Vec<(usize, String)> {
     let bosses = BufReader::new(bosses_input);
 
     let bosses_renames: Vec<HashMap<String, String>> =
-        from_reader(bosses).expect("boss_renames does not contain valid json");
+        from_reader(bosses).expect("boss_renames.json does not contain valid json");
     let bosses_renames: Vec<(String, String)> = bosses_renames
         .into_iter()
         .flat_map(|b| b.into_iter())
@@ -130,7 +130,7 @@ fn first_index_of_boss(line: &str, bosses: &Vec<String>) -> usize {
     }
 }
 
-pub fn get_valid_lines() -> Option<Vec<Vec<String>>> {
+pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
     let timers_input = File::open("timers.txt").expect("Cannot find timers.txt");
     let timers = BufReader::new(timers_input);
 
@@ -156,6 +156,8 @@ pub fn get_valid_lines() -> Option<Vec<Vec<String>>> {
         })
         .collect();
 
+    let mut formatted_lines = Vec::<(i32, Vec<String>)>::new();
+
     for (index, line) in boss_lines.iter() {
         let mut full_line = line.clone();
 
@@ -180,17 +182,19 @@ pub fn get_valid_lines() -> Option<Vec<Vec<String>>> {
             full_line.insert(1, modifier)
         }
 
-        let boss = full_line.remove(0);
-        if get_points(&boss).is_none() {
-            error_boss_lines.push(index + 1)
-        };
-
         if full_line.contains(&"at".to_string()) {
             error_at_lines.push(index + 1)
         }
 
         error_single_character_name_lines
-            .extend(full_line.iter().filter(|n| n.len() == 1).map(|_| index + 1))
+            .extend(full_line.iter().filter(|n| n.len() == 1).map(|_| index + 1));
+
+        let boss = full_line.remove(0);
+        if let Some(points) = get_points(&boss) {
+            formatted_lines.push((points, full_line));
+        } else {
+            error_boss_lines.push(index + 1)
+        }
     }
 
     let mut ready = true;
@@ -233,7 +237,7 @@ pub fn get_valid_lines() -> Option<Vec<Vec<String>>> {
     }
 
     if ready {
-        Some(boss_lines.into_iter().map(|f| f.1).collect())
+        Some(formatted_lines)
     } else {
         None
     }
