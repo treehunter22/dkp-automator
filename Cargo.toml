@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.38"
+dotenvy = "0.15.7"
 google-sheets4 = "*"
 hyper = "^0.14"
 hyper-rustls = "^0.22"

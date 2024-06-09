@@ -3,8 +3,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::File, io::BufReader};
 
-const LEGACY_LOWER_BOUND: i32 = 175;
-const LEGACY_UPPER_BOUND: i32 = 210;
 pub const MODIFIERS: [&str; 5] = ["brucybonus", "double", "doublepoints", "fail", "comp"];
 
 #[derive(Serialize, Deserialize)]
@@ -67,41 +65,18 @@ pub fn get_points(boss: &str) -> Option<i32> {
         Lazy::new(|| Regex::new("rings([1-4])x([5-6])").expect("Invalid rings regex"));
 
     static LEGACY_CAPTURE_RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(
-            format!(
-                r"^legacy(?<level>{})\.(?<star>[5-6])$",
-                (LEGACY_LOWER_BOUND..=LEGACY_UPPER_BOUND)
-                    .step_by(5)
-                    .map(|l| l.to_string())
-                    .collect::<Vec<String>>()
-                    .join("|")
-            )
-            .as_str(),
-        )
-        .expect("Invalid legacy regex")
+        Regex::new(r"^legacy(?<level>\d+)\.(?<star>[5-6])$").expect("Invalid legacy regex")
     });
 
-    static LEGACY_MATCH_RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(
-            format!(
-                r"legacy({})\.([5-6])",
-                (LEGACY_LOWER_BOUND..=LEGACY_UPPER_BOUND)
-                    .step_by(5)
-                    .map(|l| l.to_string())
-                    .collect::<Vec<String>>()
-                    .join("|")
-            )
-            .as_str(),
-        )
-        .expect("Invalid legacy regex")
-    });
+    static LEGACY_MATCH_RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"legacy(\d+)\.([5-6])").expect("Invalid legacy regex"));
 
     static ROOT_RE: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"^root\d*$").expect("Invalid roots regex"));
 
     static BOSSES_RE: Lazy<Regex> = Lazy::new(|| {
         Regex::new(&format!(
-            "^(?<boss>({}))(?<modifier>({})?)$",
+            r"^(?<boss>{})(\((?<modifier>{})\))?$",
             {
                 let mut temp = BOSSES
                     .iter()
@@ -116,13 +91,7 @@ pub fn get_points(boss: &str) -> Option<i32> {
                 temp.push(ROOT_RE.to_string().rem_first_and_last());
                 temp.join("|")
             },
-            {
-                MODIFIERS
-                    .iter()
-                    .map(|b| format!(r"\({}\)", b))
-                    .collect::<Vec<String>>()
-                    .join("|")
-            }
+            { MODIFIERS.join("|") }
         ))
         .expect("Failed to create regex")
     });
@@ -134,26 +103,26 @@ pub fn get_points(boss: &str) -> Option<i32> {
     let mut half = false;
 
     let stripped_boss = &caps["boss"];
-    let modifier = &caps["modifier"];
-
-    match modifier {
-        "brucybonus" => points += 5,
-        "doublepoints" => double = true,
-        "double" => double = true,
-        "fail" => half = true,
-        "comp" => {
-            let mut is_prio = false;
-            for prio in PRIOS.iter() {
-                if boss.contains(prio) {
-                    is_prio = true;
-                    break;
+    if let Some(modifier) = &caps.name("modifier") {
+        match modifier.as_str() {
+            "brucybonus" => points += 5,
+            "doublepoints" => double = true,
+            "double" => double = true,
+            "fail" => half = true,
+            "comp" => {
+                let mut is_prio = false;
+                for prio in PRIOS.iter() {
+                    if boss.contains(prio) {
+                        is_prio = true;
+                        break;
+                    }
+                }
+                if !is_prio {
+                    return None;
                 }
             }
-            if !is_prio {
-                return Some(0);
-            }
+            _ => (),
         }
-        _ => (),
     }
 
     match POINTS_MAP.get(stripped_boss) {
@@ -202,10 +171,11 @@ pub fn get_points(boss: &str) -> Option<i32> {
 
     if double {
         points *= 2
-    };
+    }
+
     if half {
-        points /= 2
-    };
+        points = (points + 1) / 2;
+    }
 
     Some(points)
 }

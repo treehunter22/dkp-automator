@@ -11,11 +11,11 @@ use std::io::{BufRead, BufReader};
 use std::process;
 
 fn pre_process_lines(timers: BufReader<File>) -> Vec<(usize, String)> {
-    let bosses_input = File::open("boss_renames.json").expect("Cannot find boss_renames.json");
+    let bosses_input = File::open("boss_aliases.json").expect("Cannot find boss_aliases.json");
     let bosses = BufReader::new(bosses_input);
 
     let bosses_renames: Vec<HashMap<String, String>> =
-        from_reader(bosses).expect("boss_renames.json does not contain valid json");
+        from_reader(bosses).expect("boss_aliases.json does not contain valid json");
     let bosses_renames: Vec<(String, String)> = bosses_renames
         .into_iter()
         .flat_map(|b| b.into_iter())
