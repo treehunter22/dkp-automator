@@ -48,46 +48,51 @@ fn pre_process_lines(timers: BufReader<File>) -> Vec<(usize, String)> {
 
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 3 {
-        println!(
-            "Incorrect number of arguments. Has {}, expected 2",
-            args.len() - 1
-        );
-        process::exit(1);
-    }
+    if args.len() == 3 {
+        let start_date =
+            NaiveDate::parse_from_str(&args[1], "%d %b %Y").expect("Invalid start date");
 
-    let start_date = NaiveDate::parse_from_str(&args[1], "%d %b %Y").expect("Invalid start date");
+        let end_date = NaiveDate::parse_from_str(&args[2], "%d %b %Y").expect("Invalid end date");
 
-    let end_date = NaiveDate::parse_from_str(&args[2], "%d %b %Y").expect("Invalid end date");
+        let mut start_index = 0;
+        let mut end_index = 0;
 
-    let mut start_index = 0;
-    let mut end_index = 0;
-
-    for (index, line) in lines.iter().rev() {
-        if line.len() < 20 {
-            continue;
-        }
-
-        let date = &line[..11].trim();
-        let fmt = "%d %b %Y";
-        let as_date = match NaiveDate::parse_from_str(date, fmt) {
-            Ok(date) => date,
-            Err(_) => {
+        for (index, line) in lines.iter().rev() {
+            if line.len() < 20 {
                 continue;
             }
-        };
 
-        if end_index == 0 {
-            if as_date <= end_date {
-                end_index = *index;
+            let date = &line[..11].trim();
+            let fmt = "%d %b %Y";
+            let as_date = match NaiveDate::parse_from_str(date, fmt) {
+                Ok(date) => date,
+                Err(_) => {
+                    continue;
+                }
+            };
+
+            if end_index == 0 {
+                if as_date <= end_date {
+                    end_index = *index;
+                }
+            } else if as_date < start_date {
+                start_index = *index + 1;
+                break;
             }
-        } else if as_date < start_date {
-            start_index = *index + 1;
-            break;
         }
-    }
 
-    lines[start_index..end_index + 1].to_vec()
+        lines[start_index..end_index + 1].to_vec()
+    } else if args.len() == 2 {
+        if args[1] == "all" {
+            lines.to_vec()
+        } else {
+            println!("Unexpected argument. Did you mean 'dkp-automator all'?");
+            process::exit(1)
+        }
+    } else {
+        println!("Incorrect number of arguments.\nEither run './dkp-automator all' or './dkp-automator <start> <end>'\nwhere start and end are dates of the form '4 Jun 2024'");
+        process::exit(1)
+    }
 }
 
 type Line = (usize, String);
@@ -182,15 +187,15 @@ pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
             full_line.insert(1, modifier)
         }
 
-        if full_line.contains(&"at".to_string()) {
-            error_at_lines.push(index + 1)
-        }
-
-        error_single_character_name_lines
-            .extend(full_line.iter().filter(|n| n.len() == 1).map(|_| index + 1));
-
         let boss = full_line.remove(0);
         if let Some(points) = get_points(&boss) {
+            if full_line.contains(&"at".to_string()) {
+                error_at_lines.push(index + 1)
+            }
+
+            error_single_character_name_lines
+                .extend(full_line.iter().filter(|n| n.len() == 1).map(|_| index + 1));
+
             formatted_lines.push((points, full_line));
         } else {
             error_boss_lines.push(index + 1)

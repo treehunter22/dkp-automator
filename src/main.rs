@@ -5,7 +5,7 @@ extern crate google_sheets4 as sheets4;
 use autocorrect::Autocorrecter;
 use serde_json::from_reader;
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{self, stdout, BufReader, Write};
 use std::process;
 
@@ -120,7 +120,7 @@ async fn main() {
                 loop {
                     let mut valid_input = true;
 
-                    answer = input("Select a choice (1-9): ");
+                    answer = input("Select a choice (1-8): ");
 
                     match answer.as_str() {
                         "q" => process::exit(1),
@@ -236,7 +236,16 @@ async fn main() {
     dkp_count.sort();
 
     dkp_count.retain(|(_, p)| *p > 0);
+
+    let mut f = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open("output.txt")
+        .expect("Failed to open or create output file");
+
     for (n, p) in dkp_count {
-        println!("{}, {}", n, p);
+        f.write_all(format!("{}, {}\n", n, p).as_bytes())
+            .expect("Failed to write to output file");
     }
 }
