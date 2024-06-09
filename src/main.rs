@@ -19,10 +19,10 @@ fn clear() {
 }
 
 fn build_aliases(names: Vec<String>) -> HashMap<String, String> {
-    let aliases_input = File::open("aliases.json").expect("Cannot find aliases.json");
+    let aliases_input = File::open("name_aliases.json").expect("Cannot find name_aliases.json");
 
     let mut aliases: HashMap<String, String> = from_reader(BufReader::new(aliases_input))
-        .expect("aliases.json does not contain valid json");
+        .expect("name_aliases.json does not contain valid json");
 
     for name in names {
         if name.contains(' ') {
