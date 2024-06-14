@@ -3,6 +3,7 @@ extern crate lazy_static;
 extern crate google_sheets4 as sheets4;
 
 use autocorrect::Autocorrecter;
+use colored::*;
 use serde_json::from_reader;
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
@@ -76,10 +77,10 @@ async fn main() {
 
     let mut dkp_count = HashMap::<String, i32>::new();
 
-    let autocorrector: Autocorrecter = Autocorrecter::new(aliases.keys().cloned().collect());
+    let mut autocorrector: Autocorrecter = Autocorrecter::new(aliases.keys().cloned().collect());
     let mut discard = HashSet::<String>::new();
 
-    for (points, names) in lines {
+    for (points, names, index) in lines {
         let mut actual_names = Vec::<String>::new();
 
         'names: for name in names {
@@ -99,9 +100,14 @@ async fn main() {
             if let Some(actual_name) = aliases.get(&name) {
                 actual_names.push(actual_name.clone())
             } else {
-                let guesses = autocorrector.correct(&name).unwrap();
+                let guesses = autocorrector.correct(&name);
                 clear();
-                println!("Error found: {}\n", &name);
+                println!(
+                    "Line {index}, error found:
+{}
+",
+                    name.bold()
+                );
                 println!("Guess (1): {}", guesses[0]);
                 println!("Guess (2): {}", guesses[1]);
                 println!("Guess (3): {}", guesses[2]);
@@ -137,7 +143,7 @@ async fn main() {
                         "8" => {
                             let new_name = input("Enter the name: ");
                             aliases.insert(name.clone(), new_name.clone());
-                            actual_names.push(new_name.clone());
+                            autocorrector.add_word(new_name.clone());
                             continue 'names;
                         }
                         "" => {
@@ -164,7 +170,7 @@ async fn main() {
                             actual_names.push(actual_name.clone());
                             break;
                         } else {
-                            let correction_guesses = autocorrector.correct(&correction).unwrap();
+                            let correction_guesses = autocorrector.correct(&correction);
 
                             println!("\nThe name {correction} is invalid.\n");
                             println!("Guess (1): {}", correction_guesses[0]);
