@@ -23,30 +23,12 @@ impl Autocorrecter {
         let mut similarities: Vec<(String, f64)> = self
             .vocab
             .iter()
-            .map(|v| (v.clone(), 1.0 - textdistance::str::jaccard(v, &input_word)))
+            .map(|v| (v.clone(), textdistance::str::cosine(v, &input_word)))
             .collect();
 
-        similarities.sort_by(|(_, a), (_, b)| a.total_cmp(b));
-        let similarities: Vec<String> = similarities.into_iter().map(|(a, _)| a).collect();
+        similarities.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let similarities: Vec<String> = similarities.into_iter().map(|(a, _)| a).rev().collect();
 
-        let mut result = similarities[..4].to_vec();
-
-        let mut similarities: Vec<(String, f64)> = self
-            .vocab
-            .iter()
-            .map(|v| (v.clone(), 1.0 - textdistance::str::jaccard(v, &input_word)))
-            .collect();
-
-        similarities.sort_by(|(_, a), (_, b)| a.total_cmp(b));
-        let similarities: Vec<String> = similarities.into_iter().map(|(a, _)| a).collect();
-
-        for name in similarities {
-            if !result.contains(&name) {
-                result.insert(1, name);
-                break;
-            }
-        }
-
-        result
+        similarities[..5].to_vec()
     }
 }
