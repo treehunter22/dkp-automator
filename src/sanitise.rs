@@ -28,14 +28,28 @@ fn pre_process_lines(timers: BufReader<File>) -> Vec<(usize, String)> {
         .enumerate()
         .map(|(i, l)| {
             (
-                i,
+                i + 1,
                 l.expect("Line not read")
                     .split_whitespace()
-                    .fold(String::new(), |acc, e| format!("{} {}", acc, e)),
+                    .map(|x| {
+                        x.chars()
+                            .filter(|y| y.is_ascii())
+                            .collect::<String>()
+                            .to_lowercase()
+                    })
+                    .collect::<Vec<String>>()
+                    .join(" "),
             )
         })
         .filter(|(_, l)| !l.is_empty())
         .collect();
+
+    // for c in lines[0].1.chars() {
+    //     println!("{c}")
+    // }
+
+    // println!("{}", lines[0].1);
+    // process::exit(1);
 
     // Replace boss aliases/misspellings
     let lines: Vec<(usize, String)> = lines
@@ -64,7 +78,7 @@ fn pre_process_lines(timers: BufReader<File>) -> Vec<(usize, String)> {
 {}       Calculates dkp for all lines in timers.txt
 {}   Calculates dkp for a 7-day period from the date given
                         Start date must be in the format \"day short-month year\" e.g. \"2 Jun 2024\"
-                        You can also include a 24-hour time, e.g. \"2 Jun 2024 18:00\"",
+                        You can also include a 24-hour time, e.g. \"2 Jun 2024 19:00\"",
                         format!("{program_name} all").bold(),
                         format!("{program_name} <start>").bold()
             );
@@ -132,7 +146,7 @@ fn check_dates(lines: &Vec<Line>) -> Vec<usize> {
 
     for (index, line) in lines {
         if get_date(line).is_none() {
-            error_lines.push(index + 1);
+            error_lines.push(*index);
         }
     }
 
@@ -146,21 +160,25 @@ fn get_date(line: &str) -> Option<NaiveDateTime> {
 
     let date = &line[..20].trim();
     let fmt = "%d %b %Y at %H:%M";
-    match NaiveDateTime::parse_from_str(date, fmt) {
-        Ok(date) => Some(date),
-        Err(_) => {
-            if line.len() < 24 {
-                return None;
-            }
 
-            let date = &line[..24].trim();
-            let fmt = "%b %d, %Y at %I:%M %p";
-            match NaiveDateTime::parse_from_str(date, fmt) {
-                Ok(date) => Some(date),
-                Err(_) => None,
-            }
+    if let Ok(date) = NaiveDateTime::parse_from_str(date, fmt) {
+        return Some(date);
+    }
+
+    for l in 22..=24 {
+        if line.len() < l {
+            return None;
+        }
+
+        let date = &line[..l].trim();
+        let fmt = "%b %d, %Y at %I:%M %p";
+
+        if let Ok(date) = NaiveDateTime::parse_from_str(date, fmt) {
+            return Some(date);
         }
     }
+
+    None
 }
 
 fn first_index_of_boss(line: &str, bosses: &Vec<String>) -> usize {
@@ -180,13 +198,14 @@ fn first_index_of_boss(line: &str, bosses: &Vec<String>) -> usize {
     }
 }
 
-pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
+pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>, usize)>> {
     let timers_input = File::open("timers.txt").expect("Cannot find timers.txt");
     let timers = BufReader::new(timers_input);
 
     let lines = pre_process_lines(timers);
 
     let error_date_lines = check_dates(&lines);
+    // process::exit(1);
     let mut error_boss_lines = Vec::<usize>::new();
     let mut error_at_lines = Vec::<usize>::new();
     let mut error_single_character_name_lines = Vec::<usize>::new();
@@ -207,13 +226,13 @@ pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
         })
         .collect();
 
-    let mut formatted_lines = Vec::<(i32, Vec<String>)>::new();
+    let mut formatted_lines = Vec::<(i32, Vec<String>, usize)>::new();
 
     for (index, line) in boss_lines.iter() {
         let mut full_line = line.clone();
 
         let modifier = if full_line.len() < 2 {
-            general_error_lines.push(index + 1);
+            general_error_lines.push(*index);
             continue;
         } else {
             full_line.remove(1)
@@ -236,29 +255,29 @@ pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
         let boss = full_line.remove(0);
         if let Some(points) = get_points(&boss) {
             if full_line.contains(&"at".to_string()) {
-                error_at_lines.push(index + 1)
+                error_at_lines.push(*index)
             }
 
             if full_line.contains(&"not".to_string()) {
                 if full_line.len() == 3 {
                     if full_line[1] != "not" {
-                        incorrect_use_of_not_lines.push(index + 1);
+                        incorrect_use_of_not_lines.push(*index);
                     }
                 } else if full_line.len() == 2 {
                     if full_line[0] != "not" {
-                        incorrect_use_of_not_lines.push(index + 1);
+                        incorrect_use_of_not_lines.push(*index);
                     }
                 } else {
-                    incorrect_use_of_not_lines.push(index + 1);
+                    incorrect_use_of_not_lines.push(*index);
                 }
             }
 
             error_single_character_name_lines
-                .extend(full_line.iter().filter(|n| n.len() == 1).map(|_| index + 1));
+                .extend(full_line.iter().filter(|n| n.len() == 1).map(|_| index));
 
-            formatted_lines.push((points, full_line));
+            formatted_lines.push((points, full_line, *index));
         } else {
-            error_boss_lines.push(index + 1)
+            error_boss_lines.push(*index)
         }
     }
 
