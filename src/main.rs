@@ -239,7 +239,7 @@ async fn main() {
 
     let mut dkp_count: Vec<(String, i32)> = dkp_count.into_iter().collect();
 
-    dkp_count.sort();
+    dkp_count.sort_by_key(|(n, _)| n.to_lowercase());
 
     dkp_count.retain(|(_, p)| *p > 0);
 
