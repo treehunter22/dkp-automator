@@ -1,9 +1,11 @@
+use std::env;
+
 use sheets4::{hyper, hyper_rustls, oauth2, Sheets};
 
-const SAMPLE_SPREADSHEET_ID: &str = "1Ye5d67h_Uljnt58Fa1gycCaEq9G90Qsk545OIlhlC7c";
-const SAMPLE_RANGE_NAME: &str = "DKP Sheet!A3:A";
-
 pub async fn get_names_from_sheets() -> Option<Vec<String>> {
+    let spreadsheet_id = env::var("spreadsheet_id").expect("Cannot read spreadsheet_id from .env");
+    let range_name = env::var("range_name").expect("Cannot read range_name from .env");
+
     let secret: oauth2::ApplicationSecret = oauth2::read_application_secret("credentials.json")
         .await
         .expect("Cannot read credentials.json");
@@ -30,7 +32,7 @@ pub async fn get_names_from_sheets() -> Option<Vec<String>> {
 
     let result = hub
         .spreadsheets()
-        .values_get(SAMPLE_SPREADSHEET_ID, SAMPLE_RANGE_NAME)
+        .values_get(&spreadsheet_id, &range_name)
         .doit()
         .await;
 
@@ -53,6 +55,5 @@ pub async fn get_names_from_sheets() -> Option<Vec<String>> {
         })
         .collect();
 
-    println!("{:?}", names);
     Some(names)
 }

@@ -57,12 +57,13 @@ fn input(prompt: &str) -> String {
         .read_line(&mut answer)
         .expect("Failed to read input");
     answer = answer.trim().to_string();
-    println!("{}", answer);
     answer
 }
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().expect("Cannot find .env file");
+
     let Some(lines) = sanitise::get_valid_lines() else {
         return;
     };
@@ -109,8 +110,8 @@ async fn main() {
                 println!("Enter a different name (6)");
                 println!("Split into two names (7)");
                 println!("Add as new name not already in the spreadsheet (8)");
-                println!("Discard (Return)");
-                println!("Enter Q to quit");
+                println!("Discard (Enter)");
+                println!("Enter q to quit");
 
                 let mut corrections = Vec::<String>::new();
 
@@ -135,8 +136,8 @@ async fn main() {
                         }
                         "8" => {
                             let new_name = input("Enter the name: ");
-                            aliases.insert(name.clone(), new_name);
-                            actual_names.push(name.clone());
+                            aliases.insert(name.clone(), new_name.clone());
+                            actual_names.push(new_name.clone());
                             continue 'names;
                         }
                         "" => {
