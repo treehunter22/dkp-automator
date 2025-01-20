@@ -1,8 +1,9 @@
 use crate::points::get_points;
 use crate::points::BOSSES;
 use crate::points::MODIFIERS;
-use chrono::format::ParseError;
+use chrono::Days;
 use chrono::{NaiveDate, NaiveDateTime};
+use colored::*;
 use serde_json::from_reader;
 use std::collections::HashMap;
 use std::env;
@@ -22,76 +23,105 @@ fn pre_process_lines(timers: BufReader<File>) -> Vec<(usize, String)> {
         .collect();
 
     // Tidy lines
-    let lines: Vec<String> = timers
+    let lines: Vec<(usize, String)> = timers
         .lines()
-        .map(|l| {
-            l.expect("Line not read")
-                .to_lowercase()
-                .replace("  ", " ")
-                .trim_end()
-                .to_string()
+        .enumerate()
+        .map(|(i, l)| {
+            (
+                i,
+                l.expect("Line not read")
+                    .split_whitespace()
+                    .fold(String::new(), |acc, e| format!("{} {}", acc, e)),
+            )
         })
+        .filter(|(_, l)| !l.is_empty())
         .collect();
 
     // Replace boss aliases/misspellings
     let lines: Vec<(usize, String)> = lines
         .into_iter()
-        .map(|line| {
-            bosses_renames
-                .iter()
-                .fold(line, |acc, (original, replacement)| {
-                    acc.replace(original, replacement)
-                })
+        .map(|(i, line)| {
+            (
+                i,
+                bosses_renames
+                    .iter()
+                    .fold(line, |acc, (original, replacement)| {
+                        acc.replace(original, replacement)
+                    }),
+            )
         })
-        .enumerate()
         .collect();
 
     let args: Vec<String> = env::args().collect();
 
-    if args.len() == 3 {
-        let start_date =
-            NaiveDate::parse_from_str(&args[1], "%d %b %Y").expect("Invalid start date");
+    let program_name = match env::consts::OS {
+        "windows" => r".\dkp-automator.exe",
+        _ => r"./dkp-automator",
+    };
 
-        let end_date = NaiveDate::parse_from_str(&args[2], "%d %b %Y").expect("Invalid end date");
+    let usage_string = format!("Usage:
+
+{}       Calculates dkp for all lines in timers.txt
+{}   Calculates dkp for a 7-day period from the date given
+                        Start date must be in the format \"day short-month year\" e.g. \"2 Jun 2024\"
+                        You can also include a 24-hour time, e.g. \"2 Jun 2024 18:00\"",
+                        format!("{program_name} all").bold(),
+                        format!("{program_name} <start>").bold()
+            );
+
+    if args.len() != 2 {
+        println!(
+            "
+Incorrect number of arguments.
+
+{usage_string}
+"
+        );
+        process::exit(1);
+    }
+
+    let arg = &args[1];
+
+    if arg == "all" {
+        lines.to_vec()
+    } else {
+        let start_date = if let Ok(without_time) = NaiveDate::parse_from_str(arg, "%d %b %Y") {
+            without_time.and_hms_opt(0, 0, 0).unwrap()
+        } else if let Ok(withtime) = NaiveDateTime::parse_from_str(arg, "%d %b %Y %H:%M") {
+            withtime
+        } else {
+            println!(
+                "
+Invalid argument `{arg}`.
+
+{usage_string}
+"
+            );
+            process::exit(1);
+        };
+
+        let end_date = start_date.checked_add_days(Days::new(7)).unwrap();
 
         let mut start_index = 0;
         let mut end_index = 0;
 
-        for (index, line) in lines.iter().rev() {
-            if line.len() < 20 {
-                continue;
-            }
-
-            let date = &line[..11].trim();
-            let fmt = "%d %b %Y";
-            let as_date = match NaiveDate::parse_from_str(date, fmt) {
-                Ok(date) => date,
-                Err(_) => {
-                    continue;
-                }
+        for (index, (_, line)) in lines.iter().enumerate().rev() {
+            let as_date = match get_date(line) {
+                Some(date) => date,
+                None => continue,
             };
 
             if end_index == 0 {
                 if as_date <= end_date {
-                    end_index = *index;
+                    end_index = index;
                 }
             } else if as_date < start_date {
-                start_index = *index + 1;
+                start_index = index + 1;
                 break;
             }
         }
 
         lines[start_index..end_index + 1].to_vec()
-    } else if args.len() == 2 {
-        if args[1] == "all" {
-            lines.to_vec()
-        } else {
-            println!("Unexpected argument. Did you mean 'dkp-automator all'?");
-            process::exit(1)
-        }
-    } else {
-        println!("Incorrect number of arguments.\nEither run './dkp-automator all' or './dkp-automator <start> <end>'\nwhere start and end are dates of the form '4 Jun 2024'");
-        process::exit(1)
     }
 }
 
@@ -101,21 +131,36 @@ fn check_dates(lines: &Vec<Line>) -> Vec<usize> {
     let mut error_lines: Vec<usize> = Vec::new();
 
     for (index, line) in lines {
-        match check_date(line) {
-            Ok(_) => continue,
-            Err(_) => error_lines.push(index + 1),
+        if get_date(line).is_none() {
+            error_lines.push(index + 1);
         }
     }
 
     error_lines
 }
 
-fn check_date(line: &str) -> Result<(), ParseError> {
-    let date_slice = line[..20].trim();
-    let fmt = "%d %b %Y at %H:%M";
-    let _ = NaiveDateTime::parse_from_str(date_slice, fmt)?;
+fn get_date(line: &str) -> Option<NaiveDateTime> {
+    if line.len() < 20 {
+        return None;
+    }
 
-    Ok(())
+    let date = &line[..20].trim();
+    let fmt = "%d %b %Y at %H:%M";
+    match NaiveDateTime::parse_from_str(date, fmt) {
+        Ok(date) => Some(date),
+        Err(_) => {
+            if line.len() < 24 {
+                return None;
+            }
+
+            let date = &line[..24].trim();
+            let fmt = "%b %d, %Y at %I:%M %p";
+            match NaiveDateTime::parse_from_str(date, fmt) {
+                Ok(date) => Some(date),
+                Err(_) => None,
+            }
+        }
+    }
 }
 
 fn first_index_of_boss(line: &str, bosses: &Vec<String>) -> usize {
@@ -145,6 +190,7 @@ pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
     let mut error_boss_lines = Vec::<usize>::new();
     let mut error_at_lines = Vec::<usize>::new();
     let mut error_single_character_name_lines = Vec::<usize>::new();
+    let mut incorrect_use_of_not_lines = Vec::<usize>::new();
     let mut general_error_lines = Vec::<usize>::new();
 
     let boss_lines: Vec<(usize, Vec<String>)> = lines
@@ -193,6 +239,20 @@ pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
                 error_at_lines.push(index + 1)
             }
 
+            if full_line.contains(&"not".to_string()) {
+                if full_line.len() == 3 {
+                    if full_line[1] != "not" {
+                        incorrect_use_of_not_lines.push(index + 1);
+                    }
+                } else if full_line.len() == 2 {
+                    if full_line[0] != "not" {
+                        incorrect_use_of_not_lines.push(index + 1);
+                    }
+                } else {
+                    incorrect_use_of_not_lines.push(index + 1);
+                }
+            }
+
             error_single_character_name_lines
                 .extend(full_line.iter().filter(|n| n.len() == 1).map(|_| index + 1));
 
@@ -211,7 +271,6 @@ pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
             println!("{}", line);
         }
     }
-
     if !error_boss_lines.is_empty() {
         ready = false;
         println!("Cannot read boss in lines:");
@@ -223,6 +282,13 @@ pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>)>> {
         ready = false;
         println!("Word 'at' in lines:");
         for line in error_at_lines {
+            println!("{}", line);
+        }
+    }
+    if !incorrect_use_of_not_lines.is_empty() {
+        ready = false;
+        println!("Incorrect use of 'not' in lines:");
+        for line in incorrect_use_of_not_lines {
             println!("{}", line);
         }
     }
