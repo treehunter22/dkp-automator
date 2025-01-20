@@ -7,7 +7,11 @@ use colored::*;
 use serde_json::from_reader;
 use std::collections::HashMap;
 use std::env;
+use std::fs::copy;
 use std::fs::File;
+use std::io::IsTerminal;
+use std::io::Read;
+use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::process;
 
@@ -25,23 +29,20 @@ fn pre_process_lines(timers: BufReader<File>) -> Vec<(usize, String)> {
     // Tidy lines
     let lines: Vec<(usize, String)> = timers
         .lines()
-        .enumerate()
-        .map(|(i, l)| {
-            (
-                i + 1,
-                l.expect("Line not read")
-                    .split_whitespace()
-                    .map(|x| {
-                        x.chars()
-                            .filter(|y| y.is_ascii())
-                            .collect::<String>()
-                            .to_lowercase()
-                    })
-                    .collect::<Vec<String>>()
-                    .join(" "),
-            )
+        .map(|l| {
+            l.expect("Line not read")
+                .split_whitespace()
+                .map(|x| {
+                    x.chars()
+                        .filter(|y| y.is_ascii())
+                        .collect::<String>()
+                        .to_lowercase()
+                })
+                .collect::<Vec<String>>()
+                .join(" ")
         })
-        .filter(|(_, l)| !l.is_empty())
+        .filter(|l| !l.is_empty())
+        .enumerate()
         .collect();
 
     // for c in lines[0].1.chars() {
@@ -135,7 +136,22 @@ Invalid argument `{arg}`.
             }
         }
 
-        lines[start_index..end_index + 1].to_vec()
+        let lines: Vec<Line> = lines[start_index..end_index + 1]
+            .iter()
+            .map(|(a, b)| (a - start_index + 1, b.clone()))
+            .collect();
+
+        let mut t = File::options()
+            .write(true)
+            .truncate(true)
+            .open("timers.txt")
+            .unwrap();
+
+        for line in lines.iter() {
+            let _ = t.write_all(format!("{}\n", line.1).as_bytes());
+        }
+
+        lines
     }
 }
 
@@ -199,7 +215,10 @@ fn first_index_of_boss(line: &str, bosses: &Vec<String>) -> usize {
 }
 
 pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>, usize)>> {
+    copy("timers.txt", r"timers-original.txt").expect("Cannot find timers.txt");
+
     let timers_input = File::open("timers.txt").expect("Cannot find timers.txt");
+
     let timers = BufReader::new(timers_input);
 
     let lines = pre_process_lines(timers);
