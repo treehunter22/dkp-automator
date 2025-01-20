@@ -53,5 +53,6 @@ pub async fn get_names_from_sheets() -> Option<Vec<String>> {
         })
         .collect();
 
+    println!("{:?}", names);
     Some(names)
 }
