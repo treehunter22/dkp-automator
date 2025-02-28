@@ -46,7 +46,13 @@ fn build_aliases(names: Vec<String>) -> HashMap<String, String> {
             }
         }
     }
+    aliases.remove("nekotin");
+    aliases.insert("nekotin".to_string(), "NEKOTIN".to_string());
 
+    aliases.remove("nekotin2");
+    aliases.insert("nekotin2".to_string(), "NEKOTIN2".to_string());
+
+    println!("{:?}", aliases);
     aliases
 }
 
@@ -103,9 +109,10 @@ async fn main() {
                 let guesses = autocorrector.correct(&name);
                 clear();
                 println!(
-                    "Line {index}, error found:
+                    "Line {}, error found:
 {}
 ",
+                    index + 1,
                     name.bold()
                 );
                 println!("Guess (1): {}", guesses[0]);

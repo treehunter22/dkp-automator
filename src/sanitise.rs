@@ -306,42 +306,42 @@ pub fn get_valid_lines() -> Option<Vec<(i32, Vec<String>, usize)>> {
         ready = false;
         println!("Cannot read date in lines:");
         for line in error_date_lines {
-            println!("{}", line);
+            println!("{}", line + 1);
         }
     }
     if !error_boss_lines.is_empty() {
         ready = false;
         println!("Cannot read boss in lines:");
         for line in error_boss_lines {
-            println!("{}", line);
+            println!("{}", line + 1);
         }
     }
     if !error_at_lines.is_empty() {
         ready = false;
         println!("Word 'at' in lines:");
         for line in error_at_lines {
-            println!("{}", line);
+            println!("{}", line + 1);
         }
     }
     if !incorrect_use_of_not_lines.is_empty() {
         ready = false;
         println!("Incorrect use of 'not' in lines:");
         for line in incorrect_use_of_not_lines {
-            println!("{}", line);
+            println!("{}", line + 1);
         }
     }
     if !error_single_character_name_lines.is_empty() {
         ready = false;
         println!("Single character name in lines:");
         for line in error_single_character_name_lines {
-            println!("{}", line);
+            println!("{}", line + 1);
         }
     }
     if !general_error_lines.is_empty() {
         ready = false;
         println!("Error at lines:");
         for line in general_error_lines {
-            println!("{}", line);
+            println!("{}", line + 1);
         }
     }
 
